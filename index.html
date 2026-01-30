@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- referrer を落とさない（153対策の柱） -->
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>YouTube Loop Player</title>
+
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; }
+
+    /* 16:9 を維持してレスポンシブ */
+    .box { position: relative; width: 100%; padding-top: 56.25%; overflow: hidden; }
+
+    /* APIが内部で挿入するiframeに適用 */
+    #yt, #yt iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+    /* 自動再生がブロックされた時の案内 */
+    .hint {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      color:#fff; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: rgba(0,0,0,.35);
+      opacity:0; pointer-events:none; transition:opacity .2s;
+    }
+    .hint.show { opacity:1; pointer-events:auto; }
+
+    .hint button {
+      appearance:none;
+      border:1px solid rgba(255,255,255,.7);
+      background:transparent;
+      color:#fff;
+      padding:10px 14px;
+      border-radius:999px;
+      cursor:pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="box">
+    <!-- YouTube IFrame APIがここにiframeを生成する -->
+    <div id="yt"></div>
+
+    <div id="hint" class="hint">
+      <button id="play">タップして音を出す</button>
+    </div>
+  </div>
+
+  <script>
+    // ====== 設定 ======
+    const VIDEO_ID = "SmSZRlYFMnY";
+    const START_SEC = 0; // xx分xx秒 = 計xx秒（開始時間指定）
+
+    let player;
+
+    // ====== YouTube IFrame Player API 読み込み ======
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+
+    // API準備完了時に呼ばれる（グローバル必須）
+    window.onYouTubeIframeAPIReady = function () {
+      player = new YT.Player("yt", {
+        host: "https://www.youtube-nocookie.com",
+        videoId: VIDEO_ID,
+        playerVars: {
+          autoplay: 1,
+          mute: 1,                // 最初は無音で自動再生（モバイル対策）
+          start: START_SEC,       // xx秒 から開始
+          loop: 1,
+          playlist: VIDEO_ID,     // ループ必須
+          controls: 0,
+          playsinline: 1,
+          rel: 0,
+          modestbranding: 1,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: () => {
+            // 自動再生が効かない環境でも「押せば音が出る」導線を出す
+            setTimeout(() => document.getElementById("hint")?.classList.add("show"), 1200);
+          },
+          onStateChange: (e) => {
+            // 再生が始まったら案内を隠す（無音再生でもOK）
+            // YT.PlayerState.PLAYING === 1
+            if (e.data === 1) document.getElementById("hint")?.classList.remove("show");
+          }
+        }
+      });
+    };
+
+    // ====== タップで音ON ======
+    document.getElementById("play")?.addEventListener("click", () => {
+      const hint = document.getElementById("hint");
+      hint?.classList.remove("show");
+
+      if (!player) return;
+
+      // ユーザー操作なのでミュート解除が通りやすい
+      player.unMute();
+      player.setVolume(100);
+
+      // 念のため開始位置へ（環境によってズレることがある）
+      player.seekTo(START_SEC, true);
+
+      player.playVideo();
+    });
+  </script>
+</body>
+</html>
